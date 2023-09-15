@@ -2,6 +2,7 @@ defmodule Game.ClanInvitationsTest do
   use ExUnit.Case, async: false
 
   alias Game.{Clans, Players}
+  alias Game.ClanInvitation, as: Invitation
 
   describe "create invitation" do
     setup do
@@ -20,7 +21,6 @@ defmodule Game.ClanInvitationsTest do
     test "ok", %{alice: alice, bob: bob, clan: clan} do
       assert {:ok, invitation} = Clans.invite(alice, bob)
       assert invitation.clan == clan.name
-      assert invitation.from == alice.name
       assert invitation.to == bob.name
     end
 
@@ -56,10 +56,10 @@ defmodule Game.ClanInvitationsTest do
         Players.delete_all()
       end)
 
-      %{alice: alice, bob: bob, clan: clan, invitaion: invitation}
+      %{alice: alice, bob: bob, clan: clan, invitation: invitation}
     end
 
-    test "ok", %{bob: bob, invitaion: invitation} do
+    test "ok", %{bob: bob, invitation: invitation} do
       assert :ok = Clans.accept(bob, invitation)
       assert {:ok, clan} = Clans.whereis(bob)
       assert invitation.clan == clan.name
@@ -67,12 +67,18 @@ defmodule Game.ClanInvitationsTest do
 
     test "error: not player's invitation", %{invitation: invitation} do
       assert {:ok, charlie} = Players.create(name: "charlie")
-      assert {:error, :not_invitation_owner} = Clans.accept(charlie, invitation)
+      assert {:error, :not_owner} = Clans.accept(charlie, invitation)
     end
 
     test "error: already in clan", %{bob: bob, invitation: invitation} do
       assert {:ok, _} = Clans.create(bob, name: "DejaVu", tag: "[DVU]")
       assert {:error, :already_in_clan} = Clans.accept(bob, invitation)
+    end
+
+    test "error: no invitation", %{alice: alice, clan: clan} do
+      assert {:ok, charlie} = Players.create(name: "charlie")
+      invitation = %Invitation{to: charlie.name, clan: clan.name}
+      assert {:error, :no_invitation} = Clans.accept(charlie, invitation)
     end
   end
 
@@ -88,7 +94,7 @@ defmodule Game.ClanInvitationsTest do
         Players.delete_all()
       end)
 
-      %{alice: alice, bob: bob, clan: clan, invitaion: invitation}
+      %{alice: alice, bob: bob, clan: clan, invitation: invitation}
     end
 
     test "ok", %{bob: bob, invitation: invitation} do

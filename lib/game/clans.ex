@@ -9,6 +9,7 @@ defmodule Game.Clans do
   @type create_error :: :name_already_exists | :tag_already_exists | :already_in_clan
   @type invite_error :: :already_in_clan | :not_allowed | :not_in_clan | :pending_invitation
   @type accept_error :: :not_owner | :already_in_clan | :no_invitation
+  @type decline_error :: :not_owner | :already_in_clan | :no_invitation
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_opts) do
@@ -38,6 +39,13 @@ defmodule Game.Clans do
 
   def accept(_player, invitation) do
     GenServer.call(__MODULE__, {:accept, invitation})
+  end
+
+  @spec decline(Player.t(), Invitation.t()) :: :ok | {:error, decline_error()}
+  def decline(player, invitation) when player.name != invitation.to, do: {:error, :not_owner}
+
+  def decline(_player, invitation) do
+    GenServer.call(__MODULE__, {:decline, invitation})
   end
 
   @spec whereis(Player.t()) :: {:ok, Clan.t()} | {:error, :not_in_clan}
@@ -78,6 +86,16 @@ defmodule Game.Clans do
 
   def handle_call({:accept, invitation}, _from, state) do
     case do_accept(invitation, state) do
+      {:ok, new_state} ->
+        {:reply, :ok, new_state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:decline, invitation}, _from, state) do
+    case do_decline(invitation, state) do
       {:ok, new_state} ->
         {:reply, :ok, new_state}
 
@@ -157,6 +175,22 @@ defmodule Game.Clans do
 
       true ->
         {:ok, %{state | members: Map.put(members, invitation.to, invitation.clan), invitations: Map.delete(invitations, invitation.to)}}
+    end
+  end
+
+  defp do_decline(invitation, %{members: members, invitations: invitations} = state) do
+    player_invitations = Map.get(invitations, invitation.to, MapSet.new())
+
+    cond do
+      Map.has_key?(members, invitation.to) ->
+        {:error, :already_in_clan}
+
+      not MapSet.member?(player_invitations, invitation.clan) ->
+        {:error, :no_invitation}
+
+      true ->
+        player_invitations = MapSet.delete(player_invitations, invitation.clan)
+        {:ok, %{state | invitations: Map.put(invitations, invitation.to, player_invitations)}}
     end
   end
 

@@ -104,12 +104,18 @@ defmodule Game.ClanInvitationsTest do
 
     test "error: not player's invitation", %{invitation: invitation} do
       assert {:ok, charlie} = Players.create(name: "charlie")
-      assert {:error, :not_invitation_owner} = Clans.accept(charlie, invitation)
+      assert {:error, :not_owner} = Clans.accept(charlie, invitation)
     end
 
     test "error: already in clan", %{bob: bob, invitation: invitation} do
       assert {:ok, _} = Clans.create(bob, name: "DejaVu", tag: "[DVU]")
       assert {:error, :already_in_clan} = Clans.decline(bob, invitation)
+    end
+
+    test "error: no invitation", %{alice: alice, clan: clan} do
+      assert {:ok, charlie} = Players.create(name: "charlie")
+      invitation = %Invitation{to: charlie.name, clan: clan.name}
+      assert {:error, :no_invitation} = Clans.decline(charlie, invitation)
     end
   end
 end

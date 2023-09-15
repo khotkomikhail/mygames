@@ -19,9 +19,9 @@ defmodule Game.ClanInvitationsTest do
 
     test "ok", %{alice: alice, bob: bob, clan: clan} do
       assert {:ok, invitation} = Clans.invite(alice, bob)
-      assert invitation.clan_name = clan.name
-      assert invitation.from_name = alice.name
-      assert invitation.to_name = bob.name
+      assert invitation.clan == clan.name
+      assert invitation.from == alice.name
+      assert invitation.to == bob.name
     end
 
     test "error: cannot invite myself", %{alice: alice} do
@@ -36,6 +36,11 @@ defmodule Game.ClanInvitationsTest do
     test "error: not in clan", %{bob: bob} do
       assert {:ok, charlie} = Players.create(name: "charlie")
       assert {:error, :not_in_clan} = Clans.invite(bob, charlie)
+    end
+
+    test "error: pending invitation", %{alice: alice, bob: bob} do
+      assert {:ok, _} = Clans.invite(alice, bob)
+      assert {:error, :pending_invitation} = Clans.invite(alice, bob)
     end
   end
 
@@ -57,7 +62,7 @@ defmodule Game.ClanInvitationsTest do
     test "ok", %{bob: bob, invitaion: invitation} do
       assert :ok = Clans.accept(bob, invitation)
       assert {:ok, clan} = Clans.whereis(bob)
-      assert invitation.clan_name == clan.name
+      assert invitation.clan == clan.name
     end
 
     test "error: not player's invitation", %{invitation: invitation} do

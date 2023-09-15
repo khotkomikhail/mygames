@@ -10,6 +10,7 @@ defmodule Game.Clans do
   @type invite_error :: :already_in_clan | :not_allowed | :not_in_clan | :pending_invitation
   @type accept_error :: :not_owner | :already_in_clan | :no_invitation
   @type decline_error :: :not_owner | :already_in_clan | :no_invitation
+  @type kick_error :: :not_allowed | :not_leader | :not_in_clan
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_opts) do
@@ -46,6 +47,13 @@ defmodule Game.Clans do
 
   def decline(_player, invitation) do
     GenServer.call(__MODULE__, {:decline, invitation})
+  end
+
+  @spec kick(Player.t(), Player.t()) :: :ok | {:error, kick_error()}
+  def kick(player, player), do: {:error, :not_allowed}
+
+  def kick(leader, player) do
+    GenServer.call(__MODULE__, {:kick, leader.name, player.name})
   end
 
   @spec whereis(Player.t()) :: {:ok, Clan.t()} | {:error, :not_in_clan}
@@ -104,6 +112,16 @@ defmodule Game.Clans do
     end
   end
 
+  def handle_call({:kick, leader, player}, _from, state) do
+    case do_kick(leader, player, state) do
+      {:ok, new_state} ->
+        {:reply, :ok, new_state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
   def handle_call({:whereis, player_name}, _from, state) do
     case do_find_clan(player_name, state) do
       {:ok, clan} ->
@@ -135,15 +153,15 @@ defmodule Game.Clans do
            state
            | clans: Map.put(clans, clan.name, clan),
              tags: Map.put(tags, clan.tag, clan.name),
-             members: Map.put(members, clan.leader_name, clan.name),
+             members: Map.put(members, clan.leader_name, {clan.name, true}),
              invitations: Map.delete(invitations, clan.leader_name)
          }}
     end
   end
 
   defp do_invite(from, to, %{members: members, invitations: invitations} = state) do
-    clan = Map.get(members, from)
-    current_clan = Map.get(members, to)
+    {clan, _is_leader} = Map.get(members, from, {nil, nil})
+    {current_clan, _is_leader} = Map.get(members, to, {nil, nil})
     player_invitations = Map.get(invitations, to, MapSet.new())
 
     cond do
@@ -174,7 +192,7 @@ defmodule Game.Clans do
         {:error, :no_invitation}
 
       true ->
-        {:ok, %{state | members: Map.put(members, invitation.to, invitation.clan), invitations: Map.delete(invitations, invitation.to)}}
+        {:ok, %{state | members: Map.put(members, invitation.to, {invitation.clan, false}), invitations: Map.delete(invitations, invitation.to)}}
     end
   end
 
@@ -194,8 +212,24 @@ defmodule Game.Clans do
     end
   end
 
+  defp do_kick(leader, player, %{members: members} = state) do
+    {leader_clan, leader?} = Map.get(members, leader, {nil, false})
+    {player_clan, _} = Map.get(members, player, {nil, false})
+
+    cond do
+      not leader? ->
+        {:error, :not_leader}
+
+      player_clan != leader_clan ->
+        {:error, :not_in_clan}
+
+      true ->
+        {:ok, %{state | members: Map.delete(members, player)}}
+    end
+  end
+
   defp do_find_clan(name, %{clans: clans, members: members}) do
-    clan_name = Map.get(members, name)
+    {clan_name, _is_leader} = Map.get(members, name, {nil, nil})
     clan = Map.get(clans, clan_name)
 
     cond do

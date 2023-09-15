@@ -3,7 +3,7 @@ defmodule Game.ClanKickTest do
 
   alias Game.{Clans, Players}
 
-  decribe "kick from clan" do
+  describe "kick from clan" do
     setup do
       assert {:ok, alice} = Players.create(name: "alice")
       assert {:ok, bob} = Players.create(name: "bob")
@@ -34,7 +34,7 @@ defmodule Game.ClanKickTest do
 
     test "error: not a member", %{alice: alice} do
       {:ok, charlie} = Players.create(name: "charlie")
-      assert {:error, :not_member} = Clans.kick(alice, charlie)
+      assert {:error, :not_in_clan} = Clans.kick(alice, charlie)
     end
   end
 end

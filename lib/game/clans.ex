@@ -136,7 +136,10 @@ defmodule Game.Clans do
     {:reply, :ok, %{clans: %{}, members: %{}, tags: %{}, invitations: %{}}}
   end
 
-  defp do_create(clan, %{clans: clans, tags: tags, members: members, invitations: invitations} = state) do
+  defp do_create(
+         clan,
+         %{clans: clans, tags: tags, members: members, invitations: invitations} = state
+       ) do
     cond do
       Map.has_key?(clans, clan.name) ->
         {:error, :name_already_exists}
@@ -192,7 +195,12 @@ defmodule Game.Clans do
         {:error, :no_invitation}
 
       true ->
-        {:ok, %{state | members: Map.put(members, invitation.to, {invitation.clan, false}), invitations: Map.delete(invitations, invitation.to)}}
+        {:ok,
+         %{
+           state
+           | members: Map.put(members, invitation.to, {invitation.clan, false}),
+             invitations: Map.delete(invitations, invitation.to)
+         }}
     end
   end
 
